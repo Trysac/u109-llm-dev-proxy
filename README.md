@@ -1,55 +1,44 @@
 # llm-dev-proxy
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/Trysac/u109-llm-dev-proxy.svg)](https://pkg.go.dev/github.com/Trysac/u109-llm-dev-proxy)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![CI](https://github.com/Trysac/u109-llm-dev-proxy/actions/workflows/ci.yml/badge.svg)](https://github.com/Trysac/u109-llm-dev-proxy/actions/workflows/ci.yml)
+During development, repeated LLM requests are slow, costly, and introduce non-determinism. This project provides a local HTTP proxy that caches API responses on disk, using canonical JSON keying to ensure cache hits remain reliable across runs.
 
-Local HTTP proxy for LLM APIs that caches exact responses on disk for development: canonical JSON keys, auth headers never stored, record, replay and passthrough modes
+## Installation
 
-## Problem
-
-Describe in two or three sentences the concrete problem this utility solves, who hits it, and what
-they do today without it. Replace this paragraph when the first real feature lands.
-
-## Install
-
-```sh
+```bash
 go get github.com/Trysac/u109-llm-dev-proxy
 ```
 
-Requires Go 1.23 or newer. No dependencies outside the standard library.
-
-## Usage
+## Usage Example
 
 ```go
-package main
-
 import (
-	"errors"
-	"fmt"
-
-	"github.com/Trysac/u109-llm-dev-proxy"
+    "net/http"
+    "net/url"
+    "github.com/Trysac/u109-llm-dev-proxy/llmdevproxy"
 )
 
-func main() {
-	// Normalize trims surrounding whitespace and lower-cases the text.
-	out, _ := llmdevproxy.Normalize("  Hello World ")
-	fmt.Println(out) // -> "hello world"
-
-	// Blank input is rejected explicitly instead of returning an empty string.
-	if _, err := llmdevproxy.Normalize("   "); errors.Is(err, llmdevproxy.ErrBlank) {
-		fmt.Println("rejected:", err)
-	}
-}
+upURL, _ := url.Parse("https://api.openai.com")
+proxy, _ := llmdevproxy.New(llmdevproxy.Config{
+    Upstream: upURL,
+    Dir:      ".llm-cache",
+    Mode:     llmdevproxy.ModeRecord,
+})
+http.ListenAndServe("127.0.0.1:8788", proxy)
 ```
 
-## Documentation
+## Public API
 
-- [Architecture](docs/ARCHITECTURE.md) and [decisions](docs/decisions/)
-- [Testing](docs/TESTING.md) and [security](docs/SECURITY.md)
-- [Project record](docs/PROJECT.md) and [stack](docs/STACK.md)
-- [Changelog](CHANGELOG.md) and [contributing guide](CONTRIBUTING.md)
+- `New(Config) (*Proxy, error)`: Initializes the proxy.
+- `ServeHTTP(http.ResponseWriter, *http.Request)`: Standard interface to handle proxying.
+- `Key(method, uri string, header http.Header, body []byte, vary []string) string`: Calculates the cache key.
+- `Config`: Configuration struct for `Upstream`, `Dir`, `Mode`, `VaryHeaders`, `MaxRequestBytes`, `MaxResponseBytes`, `MaxEntries`, `Transport`, and `OnEvent` callback.
+- `Mode`: Constants `ModeRecord`, `ModeReplay`, `ModePassthrough`.
+- `ErrInvalidConfig`: Returned when configuration is improper.
 
-## License
+## Why not generic VCR cassettes?
 
-[MIT](LICENSE) (c) 2026 Miguel Gomez
+Unlike SDK-specific VCR libraries which require language-specific instrumentation, this is a standalone proxy. Any language or client SDK can use it simply by pointing its base URL at the local proxy, keeping the code environment-agnostic.
+
+## Security
+
+See [docs/SECURITY.md](docs/SECURITY.md) for the threat model and limits on credential storage.

@@ -1,20 +1,14 @@
-# Security notes
+# Security
 
-## Threat model
+## Threat Model
 
-`github.com/Trysac/u109-llm-dev-proxy` is a pure library without I/O. The main risks are:
+### Defended
+- **Credential Leakage**: Sensitive headers (`Authorization`, `x-api-key`, `x-goog-api-key`, `Cookie`) are forwarded to upstream providers but strictly excluded from disk storage and key calculation.
+- **Cache Corruption**: Cache writes use atomic temporary files (`os.CreateTemp` then `os.Rename`) to prevent partial writes.
+- **Network Exposure**: The default proxy listener binds strictly to `127.0.0.1`.
+- **Payload Limits**: Enforces `MaxRequestBytes` (default 10MB) and `MaxResponseBytes` (default 50MB) to prevent resource exhaustion.
 
-- **Supply chain**: a compromised dependency or CI action. Mitigation: standard library only,
-  `go.sum` verification, `govulncheck` in the local gates, Dependabot weekly updates, actions
-  pinned by commit SHA, minimal workflow permissions.
-- **Leaked secrets**: tokens committed by mistake. Mitigation: `gitleaks` runs in the local gates
-  and in CI; `.env` files are git-ignored.
-- **Untrusted input**: callers may pass hostile strings. Mitigation: validate input and return
-  explicit errors; never use `unsafe` or `os/exec` with untrusted data.
-
-## Publishing
-
-Releases are git tags served through the Go module proxy and checksum database. No registry token
-is stored in the repository.
-
-To report a vulnerability, see [SECURITY.md](../SECURITY.md).
+### Not Defended
+- **Local Multi-User Cache Poisoning**: Any user with write access to the cache directory can modify cached entries.
+- **Concurrent Duplicate Misses**: Identical requests sent simultaneously are not single-flighted; both may trigger an upstream call.
+- **Transport Security**: The local proxy listener communicates over plaintext HTTP.

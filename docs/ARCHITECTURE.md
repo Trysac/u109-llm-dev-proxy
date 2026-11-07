@@ -1,30 +1,28 @@
 # Architecture
 
-## Purpose
+## Overview
 
-`github.com/Trysac/u109-llm-dev-proxy` is a small, dependency-free Go library: Local HTTP proxy for LLM APIs that caches exact responses on disk for development: canonical JSON keys, auth headers never stored, record, replay and passthrough modes
+`llmdevproxy` sits between LLM client SDKs and upstream LLM providers (Anthropic, OpenAI, etc.).
 
-## Shape
-
-```text
-caller code --> package llmdevproxy (repository root)
-                    |
-                    +-- pure functions, no I/O, no global mutable state
-                    +-- internal/ (optional private helpers)
+```
+[Client SDK] -> [llm-dev-proxy:8788] -> [Upstream Provider]
+                      |
+                 [.llm-cache/]
 ```
 
-- **Public API**: every exported identifier of the root package. Unexported identifiers and
-  `internal/` packages may change without a major version.
-- **Errors**: invalid input returns an error; exported sentinel errors (such as `ErrBlank`) let
-  callers branch with `errors.Is`. The library never panics on input, prints or exits.
-- **Side effects**: none. If a feature needs I/O, accept an interface (`io.Reader` or a small
-  custom one) instead of opening resources, and record the choice in an ADR.
+## Request Keying
 
-## Quality contract
+Cache keys are SHA-256 digests in lowercase hex over:
+1. HTTP Method + `\n`
+2. Request URI + `\n`
+3. Sorted vary header pairs (lowercase name + `:` + first value + `\n`)
+4. `\n` delimiter
+5. Canonical JSON body (or raw bytes if non-JSON)
 
-`scripts/check` is the single definition of the gates; `fabrica.json` tells the factory and CI
-how to run it. See [TESTING.md](TESTING.md).
+### Canonical JSON Format
 
-## Decisions
+JSON bodies are decoded with `json.Decoder.UseNumber()` and re-encoded with sorted keys, HTML unescaped, no extraneous whitespace, and trailing newlines stripped. As numbers are preserved as `json.Number`, numeric formatting differences such as `1` and `1.0` produce distinct keys.
 
-Architecture decisions are recorded in [decisions/](decisions/) as numbered ADRs.
+### Security & Redaction
+
+Headers like `Authorization`, `x-api-key`, `x-goog-api-key`, and `Cookie` are forwarded to upstream during calls but are never stored on disk or included in key calculation.

@@ -9,4 +9,5 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Add llmdevproxy package and command for caching LLM HTTP requests locally with canonical JSON keying and credential safety.
 - Initial project structure from the factory utility template.

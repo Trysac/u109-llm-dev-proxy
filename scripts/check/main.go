@@ -295,7 +295,7 @@ func secretsGate() error {
 		}
 		return errors.New("FAIL - " + gitleaksHint)
 	}
-	return run(exe, "dir", ".", "--redact", "--no-banner")
+	return run(exe, "dir", ".", "--redact", "--verbose", "--no-banner")
 }
 
 func vulnGate() error {
