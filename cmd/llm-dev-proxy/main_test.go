@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"runtime"
 	"strings"
 	"sync"
 	"syscall"
@@ -70,6 +71,9 @@ func TestRun_Usage(t *testing.T) {
 }
 
 func TestRun_CleanStart(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("a process cannot send itself SIGTERM on Windows")
+	}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
